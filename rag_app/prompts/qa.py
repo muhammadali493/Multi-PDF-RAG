@@ -7,5 +7,5 @@ qa_prompt = ChatPromptTemplate.from_messages([
                     {context}
     """),
     MessagesPlaceholder(variable_name="chat_history"),
-    ("human", "{question}")
+    ("human", "{input}")
 ])

@@ -1,4 +1,3 @@
-# filepath: d:\ML\GenAI\Projects\Multi_PDF_RAG\app.py
 import os, tempfile
 import streamlit as st
 from dotenv import load_dotenv
@@ -187,10 +186,10 @@ if uploaded_files:
     skipped_count = sum(1 for r in results if r['status'] == 'skipped')
     error_count = sum(1 for r in results if r['status'] == 'error')
     
-    st.success(f"""
-    ✅ Processing complete in {elapsed:.2f} seconds!
-    - Successfully processed: {success_count}
-    - Skipped (already indexed): {skipped_count}
+    st.toast(f"""
+    Processing complete in {elapsed:.2f} seconds!
+    - Processed: {success_count}
+    - Skipped: {skipped_count}
     - Errors: {error_count}
     """)
     
@@ -215,20 +214,28 @@ user_query = st.chat_input("Ask your question...")
 if not st.session_state.file_list and not uploaded_files:
     st.info("Please upload at least one PDF document first.")
 elif user_query:
-    st.session_state.chat_history.append(HumanMessage(content=user_query))
-    with st.chat_message("user"):
-        st.write(user_query)
+    if not selected:
+        st.warning("Please select at least one file from drop down to ask question.")
+    else:
+        st.session_state.chat_history.append(HumanMessage(content=user_query))
+        with st.chat_message("user"):
+            st.write(user_query)
 
-    where = build_source_filter(selected, st.session_state.file_list) or {"source": {"$in": st.session_state.file_list}}
-    retriever = vector_store.as_retriever(k=settings.top_k, where=where)
-    
-    # Keep only last 5 previous messages (excluding current)
-    recent_history = [m for m in st.session_state.chat_history[:-1]][-5:]
-    rag = build_rag_chain(retriever=retriever, prompt=qa_prompt, llm=llm)
-    
-    answer = rag.invoke({"chat_history": recent_history, "question": user_query})
-    st.session_state.chat_history.append(AIMessage(content=answer))
-    with st.chat_message("assistant"):
-        st.write(answer)
+        where = build_source_filter(selected, st.session_state.file_list) or {"source": {"$in": st.session_state.file_list}}
+        retriever = vector_store.as_retriever(k=settings.top_k, where=where)
+        
+        # Keep only last 5 previous messages (excluding current)
+        recent_history = [m for m in st.session_state.chat_history[:-1]][-5:]
+        print(f'Recent history: {recent_history}')
+        rag = build_rag_chain(retriever=retriever, prompt=qa_prompt, llm=llm)
+        
+        # Built-in chains return dict with 'answer' key and expect 'input' instead of 'question'
+        response = rag.invoke({"input": user_query, "chat_history": recent_history})
+        print(response)
+        answer = response["answer"]
+        
+        st.session_state.chat_history.append(AIMessage(content=answer))
+        with st.chat_message("assistant"):
+            st.write(answer)
 else:
     st.info("Please enter a question in the chat box.")
